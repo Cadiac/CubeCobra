@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';
 
 import {
+  Badge,
   Button,
   Card,
   CardHeader,
@@ -124,7 +125,7 @@ class CubeOverview extends Component {
   }
 
   render() {
-    const { post, priceOwned, pricePurchase, admin, canEdit, owner, ownerID, loggedIn, followers } = this.props;
+    const { post, totalPrice, admin, canEdit, owner, ownerID, loggedIn, followers } = this.props;
     const { cube, cubeID, deleteConfirm, alerts, followed } = this.state;
     const { addAlert, onCubeUpdate } = this;
 
@@ -222,22 +223,34 @@ class CubeOverview extends Component {
                   </i>{' '}
                   • <a href={`/cube/rss/${cube._id}`}>RSS</a>
                 </h6>
-                {!cube.privatePrices && (
+                {totalPrice && (
                   <Row noGutters className="mb-1">
-                    {Number.isFinite(priceOwned) && (
-                      <TextBadge name="Owned" className="mr-2">
+                    <Col>
+                      <h6 className="mr-2">Owned</h6>
+                      <Badge color="success" className="mr-2" pill>
                         <Tooltip text="TCGPlayer Market Price as owned (excluding cards marked Not Owned)">
-                          ${Math.round(priceOwned).toLocaleString()}
+                          ${Math.round(totalPrice.owned.USD).toLocaleString('en-US')}
                         </Tooltip>
-                      </TextBadge>
-                    )}
-                    {Number.isFinite(pricePurchase) && (
-                      <TextBadge name="Buy">
+                      </Badge>
+                      <Badge color="info" className="mr-2" pill>
+                        <Tooltip text="CardMarket Price as owned (excluding cards marked Not Owned)">
+                          {Math.round(totalPrice.owned.EUR).toLocaleString('de-DE')} €
+                        </Tooltip>
+                      </Badge>
+                    </Col>
+                    <Col>
+                      <h6>Buy</h6>
+                      <Badge color="success" className="mr-2" pill>
                         <Tooltip text="TCGPlayer Market Price for cheapest version of each card">
-                          ${Math.round(pricePurchase).toLocaleString()}
+                          ${Math.round(totalPrice.purchase.USD).toLocaleString('en-US')}
                         </Tooltip>
-                      </TextBadge>
-                    )}
+                      </Badge>
+                      <Badge color="info" className="mr-2" pill>
+                        <Tooltip text="CardMarket Price for cheapest version of each card">
+                          {Math.round(totalPrice.purchase.EUR).toLocaleString('de-DE')} €
+                        </Tooltip>
+                      </Badge>
+                    </Col>
                   </Row>
                 )}
                 {admin && (
@@ -344,8 +357,16 @@ CubeOverview.propTypes = {
   post: PropTypes.shape({
     _id: PropTypes.string.isRequired,
   }),
-  priceOwned: PropTypes.number,
-  pricePurchase: PropTypes.number,
+  totalPrice: PropTypes.shape({
+    owned: {
+      EUR: PropTypes.number,
+      USD: PropTypes.number,
+    },
+    purchase: {
+      EUR: PropTypes.number,
+      USD: PropTypes.number,
+    },
+  }),
   admin: PropTypes.bool,
   cube: PropTypes.shape({
     _id: PropTypes.string.isRequired,
@@ -368,8 +389,7 @@ CubeOverview.propTypes = {
 
 CubeOverview.defaultProps = {
   post: null,
-  priceOwned: null,
-  pricePurchase: null,
+  totalPrice: null,
   admin: false,
   canEdit: false,
   loggedIn: false,

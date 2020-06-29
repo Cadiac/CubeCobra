@@ -427,36 +427,72 @@ router.get('/overview/:id', async (req, res) => {
 
     const [blogs, followers] = await Promise.all([blogsQ, followersQ]);
 
-    const cheapestDict = {};
-    for (const card of cube.cards) {
-      if (!cheapestDict[card.details.name]) {
-        for (const version of nameToCards[card.details.name]) {
-          if (!cheapestDict[version.name] || (version.prices.usd && version.prices.usd < cheapestDict[version.name])) {
-            cheapestDict[version.name] = version.prices.usd;
+    const cheapestDictUsd = {};
+    const cheapestDictEur = {};
+
+    // TODO: Don't construct this for every request!
+    if (!cube.privatePrices) {
+      for (const card of cube.cards) {
+        if (!cheapestDictUsd[card.details.name]) {
+          for (const version of nameToCards[card.details.name]) {
+            if (
+              !cheapestDictUsd[version.name] ||
+              (version.prices.usd && version.prices.usd < cheapestDictUsd[version.name])
+            ) {
+              cheapestDictUsd[version.name] = version.prices.usd;
+            }
+            if (
+              !cheapestDictUsd[version.name] ||
+              (version.prices.usd_foil && version.prices.usd_foil < cheapestDictUsd[version.name])
+            ) {
+              cheapestDictUsd[version.name] = version.prices.usd_foil;
+            }
           }
-          if (
-            !cheapestDict[version.name] ||
-            (version.prices.usd_foil && version.prices.usd_foil < cheapestDict[version.name])
-          ) {
-            cheapestDict[version.name] = version.prices.usd_foil;
+        }
+
+        if (!cheapestDictEur[card.details.name]) {
+          for (const version of nameToCards[card.details.name]) {
+            if (
+              !cheapestDictEur[version.name] ||
+              (version.prices.eur && version.prices.eur < cheapestDictEur[version.name])
+            ) {
+              cheapestDictEur[version.name] = version.prices.eur;
+            }
           }
         }
       }
     }
 
-    let totalPriceOwned = 0;
-    let totalPricePurchase = 0;
-    for (const card of cube.cards) {
-      if (!['Not Owned', 'Proxied'].includes(card.status)) {
-        if (card.finish === 'Foil' && card.details.prices.usd_foil) {
-          totalPriceOwned += card.details.prices.usd_foil || card.details.prices.usd || 0;
-        } else {
-          totalPriceOwned += card.details.prices.usd || card.details.prices.usd_foil || 0;
-        }
-      }
+    // Skip calculating total price if we're not going to display it
+    const totalPrice = cube.privatePrices
+      ? null
+      : cube.cards.reduce(
+          (total, card) => {
+            if (!['Not Owned', 'Proxied'].includes(card.status)) {
+              if (card.finish === 'Foil' && card.details.prices.usd_foil) {
+                total.owned.USD += card.details.prices.usd_foil || card.details.prices.usd || 0;
+                total.owned.EUR += card.details.prices.eur || 0;
+              } else {
+                total.owned.USD += card.details.prices.usd || card.details.prices.usd_foil || 0;
+                total.owned.EUR += card.details.prices.eur || 0;
+              }
+            }
+            total.purchase.USD += cheapestDictUsd[card.details.name] || 0;
+            total.purchase.EUR += cheapestDictEur[card.details.name] || 0;
 
-      totalPricePurchase += cheapestDict[card.details.name] || 0;
-    }
+            return total;
+          },
+          {
+            owned: {
+              USD: 0,
+              EUR: 0,
+            },
+            purchase: {
+              USD: 0,
+              EUR: 0,
+            },
+          },
+        );
 
     if (blogs) {
       for (const item of blogs) {
@@ -490,8 +526,7 @@ router.get('/overview/:id', async (req, res) => {
       followed: req.user && cube.users_following ? cube.users_following.includes(req.user.id) : false,
       followers,
       editorvalue: cube.raw_desc,
-      priceOwned: !cube.privatePrices ? totalPriceOwned : null,
-      pricePurchase: !cube.privatePrices ? totalPricePurchase : null,
+      totalPrice,
       admin,
     };
     return res.render('cube/cube_overview', {
